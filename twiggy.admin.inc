@@ -34,19 +34,25 @@ function twiggy_settings($form, &$form_state) {
     '#title' => t('Strict variables'),
     '#default_value' => $defaults['twiggy_strict_variables'],
   );
-  $form['options']['twiggy_autoescape'] = array(
-    '#type' => 'select',
-    '#title' => t('Autoescape'),
-    '#default_value' => $defaults['twiggy_autoescape'],
-    '#options' => [
-      FALSE => t('-none-'),
-      'html' => 'html',
-      'js' => 'js',
-      'url' => 'url',
-      'css' => 'css',
-      'html_attr' => 'html_attr',
-    ],
-  );
+
+  // I do not want to expose this because d8 doesn't seem to
+  // https://www.drupal.org/docs/8/theming/twig/comparison-of-phptemplate-and-twig-theming-paradigms
+  // https://www.chapterthree.com/blog/how-markup-is-safe-in-drupal-8
+
+//  $form['options']['twiggy_autoescape'] = array(
+//    '#type' => 'select',
+//    '#title' => t('Autoescape'),
+//    '#default_value' => $defaults['twiggy_autoescape'],
+//    '#options' => [
+//      FALSE => t('-none-'),
+//      'html' => 'html',
+//      'js' => 'js',
+//      'url' => 'url',
+//      'css' => 'css',
+//      'html_attr' => 'html_attr',
+//    ],
+//  );
+
   $form['options']['twiggy_charset'] = array(
     '#type' => 'textfield',
     '#title' => t('Character set'),

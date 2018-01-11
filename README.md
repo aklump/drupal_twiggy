@@ -19,7 +19,7 @@ Otherwise you need to do the following in your module directory:
 
 1. In this example I'm writing a module called _itls_, which defines a new theme called _pull_quote_.
 2. I want to use Twig for the _pull_quote_.
-3. Notice I wrap the theme item definition with `twiggy_twig()` function.
+3. Notice how each theme hook is added by using `twiggy_add_theme_hook()`.
 4. Now create a Twig file in your module at _itls/templates/pull_quote.html.twig_.
 5. Create the function `template_preprocess_pull_quote()` if needed.
 6. That's it.
@@ -28,7 +28,10 @@ Otherwise you need to do the following in your module directory:
          * Implements hook_theme().
          */
         function itls_theme($existing, $type, $theme, $path) {
-          $themes['pull_quote'] = twiggy_twig(array(
+        
+          $themes = [];
+        
+          twiggy_add_theme_hook($themes, 'pull_quote', array(
             'variables' => array(
               'quote' => '',
               'byline' => NULL,
@@ -43,6 +46,31 @@ Otherwise you need to do the following in your module directory:
 1. In this example I want to override _pull_quote_ in my theme called _flower_.
 2. Copy the file from _itls/templates/pull_quote.html.twig_ to _flower/templates/pull_quote.html.twig_ and modify as needed.
 
+## Passing HTML to Templates
+
+* Twig templates will autoescape variables as they are output unless they are objects implementing the _MarkupInterface_.
+* Passing a string to `Markup::create()` returns such an object.  But this assumes it's safe for output...
+* ... so, make it safe using your preferred method, e.g. `filter_xss` or `check_markup`.
+* Here is an example:
+
+        use Drupal\twiggy\Markup;
+        ... 
+        
+        function template_preprocess_pull_quote(&$vars) {
+          $vars['quote'] = Markup::create(filter_xss($vars['quote']));
+        }
+        
+* If using `check_markup` you may want to create a format (e.g. _twig_safe_ that prepares the string for safe output and includes as the final filter _Markup object_, in which case you could do this:
+
+        function template_preprocess_pull_quote(&$vars) {
+          $vars['quote'] = check_markup($vars['quote'], 'twig_safe');
+        }
+
+## Text Formats
+
+* When creating a text format, you may want to add the _Markup object_ as the last filter in the chain, if the output of the format is to be rendered directly in a Twig template, and is certainly safe, and contains HTML.  This will ensure that Twig does not escape what your format has already determined to be safe.
+* In effect you are moving the onus for safe output from Twig to your custom text format..
+    
 ## Twig and Drupal Best Practices
 
 <https://www.drupal.org/docs/8/theming/twig/twig-best-practices-preprocess-functions-and-templates>
@@ -59,8 +87,12 @@ Otherwise you need to do the following in your module directory:
 * trans (this is in lieu of t, which is deprecated), e.g. `{{ 'Homepage'|trans }}`
 
 
+
+
 ## Troubleshooting
 
 ### Twiggy error: Unable to find template "... 
 
-- Try clearing the theme cache.  A template file may have been deleted and you'll need to rediscover the twig files. 
+- Try clearing the theme cache.  A template file may have been deleted and Twiggy needs to rediscover the twig files. 
+
+

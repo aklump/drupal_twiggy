@@ -1,15 +1,17 @@
 {
     "name": "aklump/twiggy",
-    "description": "A simple way to use twig in Drupal.",
+    "description": "Start using Twig for your Drupal 7 websites now.",
     "type": "library",
-    "require": {
-        "twig/twig": "^1.35"
-    },
     "license": "BSD",
     "authors": [
         {
             "name": "Aaron Klump",
             "email": "sourcecode@intheloftstudios.com"
         }
-    ]
+    ],
+    "autoload": {
+        "psr-4": {
+            "Drupal\\twiggy\\": "src/Drupal/twiggy/"
+        }
+    }
 }

@@ -13,6 +13,43 @@
  * @{
  */
 
+use Drupal\twiggy\MarkupInterface;
+use Drupal\twiggy\Markup;
+
+/**
+ * Implements hook_boot().
+ */
+function twiggy_boot() {
+  _twiggy_autoload();
+}
+
+/**
+ * Require once the autoload file, which gives us Twig.
+ */
+function _twiggy_autoload() {
+  static $loaded = FALSE;
+  if (!$loaded) {
+    $loaded = TRUE;
+    $autoloader = variable_get('twiggy_vender_autoload', dirname(__FILE__) . '/vendor/autoload.php');
+    if (!file_exists($autoloader)) {
+
+      $message = t("Missing autoloader: !autoloader.", ['!autoloader' => $autoloader]);
+
+      // The developer has not specified that we should load from the drupal composer file.
+      if (!variable_get('twiggy_vender_autoload')) {
+        $message .= t(" Do you need to run `composer install` in the twiggy module directory?");
+      }
+
+      watchdog('twiggy', $message, WATCHDOG_CRITICAL);
+      throw new \RuntimeException($message);
+    }
+    require_once $autoloader;
+
+    // This handles the autoloading of our classes.
+    require_once dirname(__FILE__) . '/vendor/autoload.php';
+  }
+}
+
 /**
  * Render the output of a theme function using a twig template.
  *
@@ -47,34 +84,136 @@ function twiggy(array $vars) {
 }
 
 /**
- * Require once the autoload file, which gives us Twig.
- */
-function _twiggy_autoload() {
-  $autoloader = variable_get('twiggy_vender_autoload', dirname(__FILE__) . '/vendor/autoload.php');
-  if (!file_exists($autoloader)) {
-
-    $message = t("Missing autoloader: !autoloader.", ['!autoloader' => $autoloader]);
-
-    // The developer has not specified that we should load from the drupal composer file.
-    if (!variable_get('twiggy_vender_autoload')) {
-      $message .= t(" Do you need to run `composer install` in the twiggy module directory?");
-    }
-
-    watchdog('twiggy', $message, WATCHDOG_CRITICAL);
-    throw new \RuntimeException($message);
-  }
-  require_once $autoloader;
-}
-
-/**
  * Adds Drupal-only functions, filters, etc., to the Twig instance.
  *
  * @param $twig
  */
 function _twiggy_drupalize_twig($twig) {
+
+  // Filters.
+  $twig->addFilter(new \Twig_SimpleFilter('trans', 't', array('is_safe' => array('html'))));
+  $twig->addFilter(new \Twig_SimpleFilter('drupal_escape', 'twiggy_escape_filter', array(
+    'needs_environment' => TRUE,
+    'is_safe_callback' => 'twig_escape_filter_is_safe',
+  )));
+
+  // Functions.
   $twig->addFunction(new \Twig_SimpleFunction('url', 'url'));
-  $twig->addFilter(new Twig_SimpleFilter('trans', 't', array('is_safe' => array('html'))));
+
+  $twig->addExtension(new \Twig_Extension_Escaper('drupal_escape'));
+
+  // Replace the core escaper with our own.
+  $twig->getExtension('Twig_Extension_Core')->setEscaper('drupal_escape', 'twiggy_escape_filter');
 }
+
+/**
+ * Overrides twig_escape_filter().
+ *
+ * Replacement function for Twig's escape filter.
+ *
+ * Note: This function should be kept in sync with
+ * theme_render_and_autoescape().
+ *
+ * @param \Twig_Environment $env
+ *   A Twig_Environment instance.
+ * @param mixed             $arg
+ *   The value to be escaped.
+ * @param string            $strategy
+ *   The escaping strategy. Defaults to 'html'.
+ * @param string            $charset
+ *   The charset.
+ * @param bool              $autoescape
+ *   Whether the function is called by the auto-escaping feature (TRUE) or by
+ *   the developer (FALSE).
+ *
+ * @return string|null
+ *   The escaped, rendered output, or NULL if there is no valid output.
+ *
+ * @throws \Exception
+ *   When $arg is passed as an object which does not implement __toString(),
+ *   RenderableInterface or toString().
+ *
+ * @todo Refactor this to keep it in sync with theme_render_and_autoescape()
+ *   in https://www.drupal.org/node/2575065
+ */
+function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
+
+  // Check for a numeric zero int or float.
+  if ($arg === 0 || $arg === 0.0) {
+    return 0;
+  }
+
+  // Return early for NULL and empty arrays.
+  if ($arg == NULL) {
+    return NULL;
+  }
+
+  //  $this->bubbleArgMetadata($arg);
+
+  // Keep Twig_Markup objects intact to support autoescaping.
+  if (($arg instanceof \Twig_Markup || $arg instanceof MarkupInterface)) {
+    return $arg;
+  }
+
+  $return = NULL;
+
+  if (is_scalar($arg)) {
+    $return = (string) $arg;
+  }
+  else if (is_object($arg)) {
+    if ($arg instanceof RenderableInterface) {
+      $arg = $arg->toRenderable();
+    }
+    else if (method_exists($arg, '__toString')) {
+      $return = (string) $arg;
+    }
+    // You can't throw exceptions in the magic PHP __toString() methods, see
+    // http://php.net/manual/language.oop5.magic.php#object.tostring so
+    // we also support a toString method.
+    else if (method_exists($arg, 'toString')) {
+      $return = $arg->toString();
+    }
+    else {
+      throw new \Exception('Object of type ' . get_class($arg) . ' cannot be printed.');
+    }
+  }
+
+  // We have a string or an object converted to a string: Autoescape it!
+  if (isset($return)) {
+    if ($return instanceof MarkupInterface) {
+      return $return;
+    }
+    $autoescape = FALSE;
+
+    return twig_escape_filter($env, $return, 'html', $charset, $autoescape);
+  }
+
+  // This is a normal render array, which is safe by definition, with
+  // special simple cases already handled.
+
+  // Early return if this element was pre-rendered (no need to re-render).
+  if (isset($arg['#printed']) && $arg['#printed'] == TRUE && isset($arg['#markup']) && strlen($arg['#markup']) > 0) {
+    return $arg['#markup'];
+  }
+  $arg['#printed'] = FALSE;
+
+  return render($arg);
+}
+
+/**
+ * Return the default settings values.
+ *
+ * @return array
+ */
+function _twiggy_defaults() {
+  return [
+    'twiggy_debug' => variable_get('twiggy_debug', FALSE),
+    'twiggy_strict_variables' => variable_get('twiggy_strict_variables', TRUE),
+    'twiggy_charset' => variable_get('twiggy_charset', 'utf8'),
+    'twiggy_autoescape' => variable_get('twiggy_autoescape', 'drupal_escape'),
+  ];
+}
+
 
 /**
  * Extract the Twiggy config from the template $vars array and clean it up.
@@ -85,7 +224,6 @@ function _twiggy_drupalize_twig($twig) {
  * @throws \RuntimeException If there is no #twiggy key in the $vars.
  */
 function _twiggy_process_twiggy(&$vars) {
-  $twiggy = [];
   if (!isset($vars['#twiggy'])) {
     throw new \RuntimeException("Missing #twiggy key from \$vars");
   }
@@ -119,20 +257,6 @@ function _twiggy_template_dirs(array $twiggy) {
   }
 
   return $dirs;
-}
-
-/**
- * Return the default settings values.
- *
- * @return array
- */
-function _twiggy_defaults() {
-  return [
-    'twiggy_debug' => variable_get('twiggy_debug', FALSE),
-    'twiggy_strict_variables' => variable_get('twiggy_strict_variables', TRUE),
-    'twiggy_charset' => variable_get('twiggy_charset', 'utf8'),
-    'twiggy_autoescape' => variable_get('twiggy_autoescape', 'html'),
-  ];
 }
 
 /**
@@ -213,4 +337,44 @@ function _twiggy_find_template($dirs, $hook) {
   }
 
   return FALSE;
+}
+
+/**
+ * Implements hook_filter_info().
+ */
+function twiggy_filter_info() {
+  $filters['twiggy_markup'] = array(
+    'title' => t('Markup object'),
+    'description' => t('Wraps output in an instance of <code>\Drupal\twiggy\Markdown</code> for unescaped output in Twig templates.'),
+    'default settings' => [],
+    'tips callback' => '_twiggy_markup_tips',
+    'process callback' => '_twiggy_markup',
+  );
+
+  return $filters;
+}
+
+/**
+ * Implements hook_filter_FILTER_tips().
+ */
+function _twiggy_markup_tips($filter, $format, $long = FALSE) {
+  $tips = array();
+  $tips['twiggy_markup'] = array(
+    t('Markup object'),
+    t('Wraps output in an instance of <code>\Drupal\twiggy\Markdown</code> for unescaped output in Twig templates.'),
+  );
+
+  return $long ? $tips[$filter->name][1] : $tips[$filter->name][0];
+}
+
+/**
+ * Filter processing function (wraps TwiggyMarkupFilter)
+ *
+ * @param $text
+ * @param $filter
+ *
+ * @return mixed
+ */
+function _twiggy_markup($text, $filter) {
+  return Markup::create($text);
 }
