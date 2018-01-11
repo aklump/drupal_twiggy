@@ -1,0 +1,11 @@
+name = Twiggy
+description = Start using Twig for your Drupal 7 websites now.
+package = Other
+version = 7.x-1.0-rc1
+core = 7.x
+php = 5.3
+configure = admin/config/content/twiggy
+author = aklump
+;project = twiggy
+;project status url = http://code.intheloftstudios.com/release-history
+;homepage = http://www.intheloftstudios.com/packages/drupal/twiggy

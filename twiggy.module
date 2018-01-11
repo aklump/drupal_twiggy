@@ -1,0 +1,216 @@
+<?php
+/**
+ * @file
+ * Base file for the twiggy module.
+ *
+ * @link     https://twig.symfony.com/doc/1.x/
+ * @link     https://www.drupal.org/docs/8/theming/twig/twig-template-naming-conventions
+ *
+ * @todo     Implement d8 filters:
+ *           https://www.drupal.org/docs/8/theming/twig/filters-modifying-variables-in-twig-templates
+ *
+ * @defgroup twiggy Twiggy
+ * @{
+ */
+
+/**
+ * Render the output of a theme function using a twig template.
+ *
+ * @param array $vars
+ *
+ * @return string
+ */
+function twiggy(array $vars) {
+  try {
+    $output = '';
+    $twiggy = _twiggy_process_twiggy($vars);
+    $defaults = _twiggy_defaults();
+    $twig_settings = array_combine(array_map(function ($key) {
+      return substr($key, 7);
+    }, array_keys($defaults)), $defaults);
+
+    _twiggy_autoload();
+    $loader = new Twig_Loader_Filesystem($twiggy['template_dir']);
+    $twig = new Twig_Environment($loader, $twig_settings);
+    _twiggy_drupalize_twig($twig);
+
+    $output = $twig->render($twiggy['template_file'], $vars);
+
+  } catch (\Exception $exception) {
+    watchdog_exception('twiggy', $exception);
+    if ($defaults['twiggy_debug']) {
+      drupal_set_message(t('Twiggy error: @error', ['@error' => $exception->getMessage()]), 'error', FALSE);
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * Require once the autoload file, which gives us Twig.
+ */
+function _twiggy_autoload() {
+  $autoloader = variable_get('twiggy_vender_autoload', dirname(__FILE__) . '/vendor/autoload.php');
+  if (!file_exists($autoloader)) {
+
+    $message = t("Missing autoloader: !autoloader.", ['!autoloader' => $autoloader]);
+
+    // The developer has not specified that we should load from the drupal composer file.
+    if (!variable_get('twiggy_vender_autoload')) {
+      $message .= t(" Do you need to run `composer install` in the twiggy module directory?");
+    }
+
+    watchdog('twiggy', $message, WATCHDOG_CRITICAL);
+    throw new \RuntimeException($message);
+  }
+  require_once $autoloader;
+}
+
+/**
+ * Adds Drupal-only functions, filters, etc., to the Twig instance.
+ *
+ * @param $twig
+ */
+function _twiggy_drupalize_twig($twig) {
+  $twig->addFunction(new \Twig_SimpleFunction('url', 'url'));
+  $twig->addFilter(new Twig_SimpleFilter('trans', 't', array('is_safe' => array('html'))));
+}
+
+/**
+ * Extract the Twiggy config from the template $vars array and clean it up.
+ *
+ * @param array $vars The array sent to theme function from theme().  It should contain the key #twiggy
+ *
+ * @return array
+ * @throws \RuntimeException If there is no #twiggy key in the $vars.
+ */
+function _twiggy_process_twiggy(&$vars) {
+  $twiggy = [];
+  if (!isset($vars['#twiggy'])) {
+    throw new \RuntimeException("Missing #twiggy key from \$vars");
+  }
+  $twiggy = $vars['#twiggy'];
+  unset($vars['#twiggy']);
+
+  return $twiggy;
+}
+
+/**
+ * Return an array of directories (relative to DRUPAL_ROOT) to search for templates based on a module
+ *
+ * @return array
+ * @throws \RuntimeException If there are no template directories.
+ */
+function _twiggy_template_dirs(array $twiggy) {
+  global $theme;
+
+  $templates = [];
+
+  // These should be listed theme to module order.
+  $templates[] = drupal_get_path('theme', $theme) . '/templates';
+  $templates[] = drupal_get_path('module', $twiggy['module']) . '/templates';
+
+  $dirs = array_filter($templates, function ($path) {
+    return is_dir($path);
+  });
+
+  if (count($dirs) === 0) {
+    throw new \RuntimeException("No template directories found.");
+  }
+
+  return $dirs;
+}
+
+/**
+ * Return the default settings values.
+ *
+ * @return array
+ */
+function _twiggy_defaults() {
+  return [
+    'twiggy_debug' => variable_get('twiggy_debug', FALSE),
+    'twiggy_strict_variables' => variable_get('twiggy_strict_variables', TRUE),
+    'twiggy_charset' => variable_get('twiggy_charset', 'utf8'),
+    'twiggy_autoescape' => variable_get('twiggy_autoescape', 'html'),
+  ];
+}
+
+/**
+ * Implements hook_menu().
+ */
+function twiggy_menu() {
+  $items['admin/config/content/twiggy'] = array(
+    'title' => 'Twiggy Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('twiggy_settings'),
+    'access arguments' => array('twiggy:administer'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'twiggy.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function twiggy_permission() {
+  return array(
+    'twiggy:administer' => array(
+      'title' => t('Administer my module'),
+      'description' => t('Configure Twiggy module settings.'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Use this function in your hook_theme to convert your theme definition to use Twiggy.
+ *
+ * @param array  $themes     An array of theme hooks, as returned from hook_theme in your module.
+ * @param string $hook       The name of the new theme hook being defined.
+ * @param array  $definition The array that defines the theme hook as described by hook_theme
+ *
+ * @return array
+ *
+ * @see hook_theme
+ */
+function twiggy_add_theme_hook(array &$themes, $hook, array $definition) {
+  $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+  array_shift($bt);
+  $function = array_shift($bt);
+  $definition['function'] = 'twiggy';
+  $twiggy = [];
+
+  // Detect the module defining the theme.
+  $twiggy['module'] = substr($function['function'], 0, strlen($function['function']) - 6);;
+
+  // Detect the template file to use.
+  $dirs = _twiggy_template_dirs($twiggy);
+  $template = _twiggy_find_template($dirs, $hook);
+  $twiggy['template_dir'] = dirname($template);
+  $twiggy['template_file'] = basename($template);
+
+  $definition['variables']['#twiggy'] = $twiggy;
+
+  $themes[$hook] = $definition;
+}
+
+/**
+ * Find the template file to use for a given hook.
+ *
+ * @param $dirs
+ * @param $hook
+ *
+ * @return bool|string
+ */
+function _twiggy_find_template($dirs, $hook) {
+  foreach ($dirs as $dir) {
+    $path = "$dir/$hook.html.twig";
+    if (is_file($path)) {
+      return $path;
+    }
+  }
+
+  return FALSE;
+}
