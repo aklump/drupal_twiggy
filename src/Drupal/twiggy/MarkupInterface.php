@@ -39,4 +39,10 @@ interface MarkupInterface extends \JsonSerializable {
    */
   public function __toString();
 
+  /**
+   * Return this object as a render array
+   *
+   * @return arrays
+   */
+  public function asRenderArray();
 }

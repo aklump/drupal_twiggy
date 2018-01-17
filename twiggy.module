@@ -13,8 +13,8 @@
  * @{
  */
 
-use Drupal\twiggy\MarkupInterface;
 use Drupal\twiggy\Markup;
+use Drupal\twiggy\MarkupInterface;
 
 /**
  * Implements hook_boot().
@@ -60,8 +60,8 @@ function _twiggy_autoload() {
 function twiggy(array $vars) {
   try {
     $output = '';
-    $twiggy = _twiggy_process_twiggy($vars);
     $defaults = _twiggy_defaults();
+    $twiggy = _twiggy_process_twiggy($vars);
     $twig_settings = array_combine(array_map(function ($key) {
       return substr($key, 7);
     }, array_keys($defaults)), $defaults);
@@ -92,14 +92,14 @@ function _twiggy_drupalize_twig($twig) {
 
   // Filters.
   $twig->addFilter(new \Twig_SimpleFilter('trans', 't', array('is_safe' => array('html'))));
-  $twig->addFilter(new \Twig_SimpleFilter('drupal_escape', 'twiggy_escape_filter', array(
-    'needs_environment' => TRUE,
-    'is_safe_callback' => 'twig_escape_filter_is_safe',
-  )));
 
   // Functions.
   $twig->addFunction(new \Twig_SimpleFunction('url', 'url'));
 
+  $twig->addFilter(new \Twig_SimpleFilter('drupal_escape', 'twiggy_escape_filter', array(
+    'needs_environment' => TRUE,
+    'is_safe_callback' => 'twig_escape_filter_is_safe',
+  )));
   $twig->addExtension(new \Twig_Extension_Escaper('drupal_escape'));
 
   // Replace the core escaper with our own.
@@ -151,7 +151,7 @@ function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
   //  $this->bubbleArgMetadata($arg);
 
   // Keep Twig_Markup objects intact to support autoescaping.
-  if (($arg instanceof \Twig_Markup || $arg instanceof MarkupInterface)) {
+  if (($arg instanceof \Twig_Markup || $arg instanceof MarkupInterface || _twiggy_is_attributes_string($arg))) {
     return $arg;
   }
 
@@ -198,6 +198,29 @@ function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
   $arg['#printed'] = FALSE;
 
   return render($arg);
+}
+
+/**
+ * Analyze $arg to see if it's the string value of an attribute, and thus safe to output.
+ *
+ * @param $arg , e.g.,  class="contextual-links-region card layout-item"
+ *
+ * @return bool
+ */
+function _twiggy_is_attributes_string(&$arg) {
+
+  // We can play with the fact that attributes strings start always with a space.
+  if (!is_string($arg) || $arg[0] !== ' ') {
+    return FALSE;
+  }
+  if (preg_match_all('/(?:[a-z\-\_]+)=".*?"/', $arg, $matches)) {
+    $safe = ' ' . implode(' ', $matches[0]);
+    if (strlen($safe) === strlen($arg)) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }
 
 /**
@@ -299,29 +322,67 @@ function twiggy_permission() {
  *
  * @see hook_theme
  */
-function twiggy_add_theme_hook(array &$themes, $hook, array $definition) {
+function twiggy_add_theme_hook(array &$themes, $hook, array $definition = []) {
+
   $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
   array_shift($bt);
   $function = array_shift($bt);
+  $defaults = _twiggy_defaults();
+
+  // This comes in from hook_theme_registry_alter.
+  if (preg_match('/theme_registry_alter$/', $function['function'])) {
+    if (!isset($themes[$hook])) {
+      if ($defaults['twiggy_debug']) {
+        drupal_set_message(t("Trying to use Twig for a hook that does not exist: %hook", ['%hook' => $hook]), 'error', FALSE);
+      }
+
+      return;
+    }
+    $definition = _twiggy_alter_theme_hook($themes[$hook]);
+  }
+
   $definition['function'] = 'twiggy';
   $twiggy = [];
 
   // Detect the module defining the theme.
-  $twiggy['module'] = substr($function['function'], 0, strlen($function['function']) - 6);;
+  $twiggy['module'] = preg_replace('/_theme_registry_alter|_theme$/i', '', $function['function']);
 
   // Detect the template file to use.
   $dirs = _twiggy_template_dirs($twiggy);
-  $template = _twiggy_find_template($dirs, $hook);
+  if (!($template = _twiggy_find_template($dirs, $hook)) && $defaults['twiggy_debug']) {
+    drupal_set_message(t("Cannot find Twig file for %hook", ['%hook' => $hook]), 'error', FALSE);
+  }
   $twiggy['template_dir'] = dirname($template);
   $twiggy['template_file'] = basename($template);
 
   $definition['variables']['#twiggy'] = $twiggy;
 
+  // Give them the Attributes object.
+  if (module_exists('d8now')) {
+    data_api()->ensure($definition, 'd8now.Attribute', []);
+    $definition['d8now']['Attribute'] += ['attributes' => 'attributes_array'];
+  }
+
   $themes[$hook] = $definition;
 }
 
+function _twiggy_alter_theme_hook($hook) {
+  // https://api.drupal.org/api/drupal/modules%21system%21system.api.php/function/hook_theme/7.x
+  unset($hook['template']);
+  if (isset($hook['render element'])) {
+    array_unshift($hook['preprocess functions'], '_twiggy_restore_render_element');
+  }
+
+  //  unset($hook['theme path']);
+
+  return $hook;
+}
+
+function _twiggy_restore_render_element($a, $b) {
+  return;
+}
 /**
- * Find the template file to use for a given hook.
+ * Find the template file to use for a given hook, pull_quote looks for pull-quote.html.twig
  *
  * @param $dirs
  * @param $hook
@@ -329,6 +390,7 @@ function twiggy_add_theme_hook(array &$themes, $hook, array $definition) {
  * @return bool|string
  */
 function _twiggy_find_template($dirs, $hook) {
+  $hook = str_replace('_', '-', $hook);
   foreach ($dirs as $dir) {
     $path = "$dir/$hook.html.twig";
     if (is_file($path)) {
@@ -377,4 +439,13 @@ function _twiggy_markup_tips($filter, $format, $long = FALSE) {
  */
 function _twiggy_markup($text, $filter) {
   return Markup::create($text);
+}
+
+/**
+ * Implements hook_block_view_alter().
+ */
+function twiggy_block_view_alter(&$data, $block) {
+  if (isset($data['content']) && $data['content'] instanceof Markup) {
+    $data['content'] = $data['content']->asRenderArray();
+  }
 }

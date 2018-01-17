@@ -15,12 +15,12 @@ Otherwise you need to do the following in your module directory:
 
     composer install
 
-## Module Providing a New, Twig-Rendered Theme Item
+## If You are Writing a Module and You Want to Provide a New Theme Hook Using Twig
 
 1. In this example I'm writing a module called _itls_, which defines a new theme called _pull_quote_.
 2. I want to use Twig for the _pull_quote_.
 3. Notice how each theme hook is added by using `twiggy_add_theme_hook()`.
-4. Now create a Twig file in your module at _itls/templates/pull_quote.html.twig_.
+4. Now create a Twig file in your module at _itls/templates/pull-quote.html.twig_. **Notice the hyphen instead of underscore.**
 5. Create the function `template_preprocess_pull_quote()` if needed.
 6. That's it.
     
@@ -41,7 +41,16 @@ Otherwise you need to do the following in your module directory:
           return $themes;
         }
 
-## Theme Overriding a Twiggy Theme Item
+## If You Want to Use Twig for An Existing Template
+
+    /**
+     * Implements hook_theme_alter().
+     */
+    function itls_theme_registry_alter(&$themes) {
+        twiggy_add_theme_hook($themes, 'views_view_unformatted');
+    }
+
+## If You Want Your Theme to Override a Theme Hook Using Twig
 
 1. In this example I want to override _pull_quote_ in my theme called _flower_.
 2. Copy the file from _itls/templates/pull_quote.html.twig_ to _flower/templates/pull_quote.html.twig_ and modify as needed.
@@ -82,12 +91,21 @@ Otherwise you need to do the following in your module directory:
 ### Functions
 
 * url, e.g. `<a href="{{ url('node/1') }}">`
+* render, e.g. `{{ render(page) }}`
 
 ### Filters
+
 * trans (this is in lieu of t, which is deprecated), e.g. `{{ 'Homepage'|trans }}`
 
+## D8Now Module
 
+By enabling the [D8Now module](https://github.com/aklump/drupal_d8now) you will also get:
 
+* Automatic `$attribute` instance on each Twiggy hook.
+
+## Attributes
+
+<https://www.drupal.org/docs/8/theming-drupal-8/using-attributes-in-templates>
 
 ## Troubleshooting
 

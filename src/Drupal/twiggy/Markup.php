@@ -15,4 +15,7 @@ class Markup extends \Twig_Markup implements MarkupInterface {
 
   use MarkupTrait;
 
+  public function asRenderArray() {
+    return ['#markup' => strval($this)];
+  }
 }
