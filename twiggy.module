@@ -13,8 +13,67 @@
  * @{
  */
 
+use AKlump\LoftLib\Code\Strings;
 use Drupal\twiggy\Markup;
 use Drupal\twiggy\MarkupInterface;
+
+
+// TODO These are not included and we need a dependency on this.
+
+/**
+ * Render the output of a theme function using a twig template.
+ *
+ * @param array $vars
+ *
+ * @return string
+ */
+function twiggy(array $vars) {
+  try {
+    $registry = theme_get_registry(TRUE);
+    $twiggy = $registry[$vars['theme_hook_original']]['twiggy'];
+    $output = '';
+    $defaults = _twiggy_defaults();
+    $twig_settings = array_combine(array_map(function ($key) {
+      return substr($key, 7);
+    }, array_keys($defaults)), $defaults);
+
+    _twiggy_autoload();
+    $loader = new Twig_Loader_Filesystem($twiggy['template_dir']);
+    $twig = new Twig_Environment($loader, $twig_settings);
+    _twiggy_drupalize_twig($twig);
+
+    //    // Leverage d8now and ensure we have $attributes
+    //    // TODO Pull this into self to remove dependency?
+    //    global $_d8now_attributes_class;
+    //    if ($_d8now_attributes_class && (!isset($vars['attributes']) || !$vars['attributes'] instanceof $_d8now_attributes_class)) {
+    //      $g = data_api();
+    //
+    //      // Gotcha! We ignore $vars['attributes'] and $vars['classes'] as determined by template_process, instead using their array source keys, so if you are tweaking anything post template_process, you must alter these arrays and not just the flat versions found in keys: 'classes', and 'attributes'.
+    //      $g->ensure($vars, 'attributes_array', []);
+    //      $g->ensure($vars, 'attributes_array.class', []);
+    //      $g->ensure($vars, 'classes_array', []);
+    //
+    //      $import = $vars['attributes_array'];
+    //      $import['class'] += $vars['classes_array'];
+    //
+    //      $vars['attributes'] = new $_d8now_attributes_class($import);
+    //    }
+
+    $output = $twig->render($twiggy['template_file'], $vars);
+
+  } catch (\Exception $exception) {
+    watchdog_exception('twiggy', $exception);
+    if ($defaults['twiggy_debug']) {
+      drupal_set_message(t('Twiggy error: @error in @path', [
+        '@path' => $twiggy['template_dir'] . '/' . $twiggy['template_file'],
+        '@error' => $exception->getMessage(),
+      ]), 'error', FALSE);
+    }
+  }
+
+  return $output;
+}
+
 
 /**
  * Implements hook_boot().
@@ -51,39 +110,6 @@ function _twiggy_autoload() {
 }
 
 /**
- * Render the output of a theme function using a twig template.
- *
- * @param array $vars
- *
- * @return string
- */
-function twiggy(array $vars) {
-  try {
-    $output = '';
-    $defaults = _twiggy_defaults();
-    $twiggy = _twiggy_process_twiggy($vars);
-    $twig_settings = array_combine(array_map(function ($key) {
-      return substr($key, 7);
-    }, array_keys($defaults)), $defaults);
-
-    _twiggy_autoload();
-    $loader = new Twig_Loader_Filesystem($twiggy['template_dir']);
-    $twig = new Twig_Environment($loader, $twig_settings);
-    _twiggy_drupalize_twig($twig);
-
-    $output = $twig->render($twiggy['template_file'], $vars);
-
-  } catch (\Exception $exception) {
-    watchdog_exception('twiggy', $exception);
-    if ($defaults['twiggy_debug']) {
-      drupal_set_message(t('Twiggy error: @error', ['@error' => $exception->getMessage()]), 'error', FALSE);
-    }
-  }
-
-  return $output;
-}
-
-/**
  * Adds Drupal-only functions, filters, etc., to the Twig instance.
  *
  * @param $twig
@@ -104,6 +130,9 @@ function _twiggy_drupalize_twig($twig) {
 
   // Replace the core escaper with our own.
   $twig->getExtension('Twig_Extension_Core')->setEscaper('drupal_escape', 'twiggy_escape_filter');
+
+  // Allow modules to add functions, filters, etc.
+  drupal_alter('twiggy_twig', $twig);
 }
 
 /**
@@ -237,25 +266,6 @@ function _twiggy_defaults() {
   ];
 }
 
-
-/**
- * Extract the Twiggy config from the template $vars array and clean it up.
- *
- * @param array $vars The array sent to theme function from theme().  It should contain the key #twiggy
- *
- * @return array
- * @throws \RuntimeException If there is no #twiggy key in the $vars.
- */
-function _twiggy_process_twiggy(&$vars) {
-  if (!isset($vars['#twiggy'])) {
-    throw new \RuntimeException("Missing #twiggy key from \$vars");
-  }
-  $twiggy = $vars['#twiggy'];
-  unset($vars['#twiggy']);
-
-  return $twiggy;
-}
-
 /**
  * Return an array of directories (relative to DRUPAL_ROOT) to search for templates based on a module
  *
@@ -322,15 +332,12 @@ function twiggy_permission() {
  *
  * @see hook_theme
  */
-function twiggy_add_theme_hook(array &$themes, $hook, array $definition = []) {
-
-  $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-  array_shift($bt);
-  $function = array_shift($bt);
+function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
   $defaults = _twiggy_defaults();
+  $definition = $themes[$hook];
 
   // This comes in from hook_theme_registry_alter.
-  if (preg_match('/theme_registry_alter$/', $function['function'])) {
+  if (preg_match('/theme_registry_alter$/', $function)) {
     if (!isset($themes[$hook])) {
       if ($defaults['twiggy_debug']) {
         drupal_set_message(t("Trying to use Twig for a hook that does not exist: %hook", ['%hook' => $hook]), 'error', FALSE);
@@ -345,33 +352,76 @@ function twiggy_add_theme_hook(array &$themes, $hook, array $definition = []) {
   $twiggy = [];
 
   // Detect the module defining the theme.
-  $twiggy['module'] = preg_replace('/_theme_registry_alter|_theme$/i', '', $function['function']);
+  $twiggy['module'] = preg_replace('/_theme_registry_alter|_theme$/i', '', $function);
 
   // Detect the template file to use.
   $dirs = _twiggy_template_dirs($twiggy);
-  if (!($template = _twiggy_find_template($dirs, $hook)) && $defaults['twiggy_debug']) {
+  if (!(list($pattern, $template) = _twiggy_find_template($dirs, $hook, $definition)) && $defaults['twiggy_debug']) {
     drupal_set_message(t("Cannot find Twig file for %hook", ['%hook' => $hook]), 'error', FALSE);
   }
   $twiggy['template_dir'] = dirname($template);
   $twiggy['template_file'] = basename($template);
+  $twiggy['base_hook'] = $hook;
+  $definition['twiggy'] = $twiggy;
 
-  $definition['variables']['#twiggy'] = $twiggy;
+  $hook = str_replace('-', '_', preg_replace('/\.html\.twig$/', '', basename($template)));
 
-  // Give them the Attributes object.
-  if (module_exists('d8now')) {
-    data_api()->ensure($definition, 'd8now.Attribute', []);
-    $definition['d8now']['Attribute'] += ['attributes' => 'attributes_array'];
+  // Add processors to make sure we have Attributes
+  global $_d8now_attributes_class;
+  if (!empty($_d8now_attributes_class)) {
+    array_unshift($definition['preprocess functions'], '_twiggy_process');
+    $definition['process functions'][] = 'twiggy_process';
   }
 
   $themes[$hook] = $definition;
 }
 
+function _twiggy_process(&$vars, $hook) {
+  global $_d8now_attributes_class;
+  if (empty($vars['attributes'])) {
+    $vars['attributes'] = [];
+  }
+  if (is_array($vars['attributes'])) {
+    $vars['attributes'] = new $_d8now_attributes_class($vars['attributes']);
+  }
+
+  // Convert all variables to lower-camel-cased keys
+  twiggy_camel_case_vars($vars);
+}
+
+/**
+ * Convert all variable keys to lower camel case.
+ *
+ * @param $vars
+ */
+function twiggy_camel_case_vars(&$vars) {
+  foreach ($vars as $key => $value) {
+    if ($key !== ($cc_key = Strings::lowerCamel($key)) && !isset($vars[$cc_key])) {
+      $vars[$cc_key] = $value;
+      //      unset($vars[$key]);
+    }
+  }
+}
+
+function twiggy_theme_registry_alter(&$theme_registry) {
+  // Determine which, if any hooks use twiggy.
+  $hooks = array_map(function ($item) {
+    return $item['twiggy'];
+  }, array_filter($theme_registry, function ($item) {
+    return isset($item['twiggy']);
+  }));
+
+  foreach ($hooks as $hook => $function) {
+    _twiggy_add_theme_hook($theme_registry, $hook, $function);
+  }
+}
+
 function _twiggy_alter_theme_hook($hook) {
   // https://api.drupal.org/api/drupal/modules%21system%21system.api.php/function/hook_theme/7.x
   unset($hook['template']);
-  if (isset($hook['render element'])) {
-    array_unshift($hook['preprocess functions'], '_twiggy_restore_render_element');
-  }
+  //  if (isset($hook['render element'])) {
+  //    array_unshift($hook['preprocess functions'], '_twiggy_restore_render_element');
+  //  }
 
   //  unset($hook['theme path']);
 
@@ -381,6 +431,7 @@ function _twiggy_alter_theme_hook($hook) {
 function _twiggy_restore_render_element($a, $b) {
   return;
 }
+
 /**
  * Find the template file to use for a given hook, pull_quote looks for pull-quote.html.twig
  *
@@ -389,16 +440,26 @@ function _twiggy_restore_render_element($a, $b) {
  *
  * @return bool|string
  */
-function _twiggy_find_template($dirs, $hook) {
-  $hook = str_replace('_', '-', $hook);
+function _twiggy_find_template(array $dirs, $hook, array $definition) {
+  $g = data_api();
+
+
+  // TODO Clean up
+  $pattern = $g->get($definition, 'pattern', $hook);
+  $pattern = $hook;
+  $pattern = str_replace('_', '-', $pattern);
+
+  $template_file = NULL;
   foreach ($dirs as $dir) {
-    $path = "$dir/$hook.html.twig";
-    if (is_file($path)) {
-      return $path;
+    $mask = '/' . preg_quote($pattern) . '.*\.html\.twig/';
+    $files = file_scan_directory($dir, $mask, ['recurse' => FALSE]);
+    if ($files) {
+      $template_file = key($files);
+      break;
     }
   }
 
-  return FALSE;
+  return [$pattern, $template_file];
 }
 
 /**
@@ -449,3 +510,5 @@ function twiggy_block_view_alter(&$data, $block) {
     $data['content'] = $data['content']->asRenderArray();
   }
 }
+
+

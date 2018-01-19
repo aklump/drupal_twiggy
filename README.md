@@ -19,8 +19,8 @@ Otherwise you need to do the following in your module directory:
 
 1. In this example I'm writing a module called _itls_, which defines a new theme called _pull_quote_.
 2. I want to use Twig for the _pull_quote_.
-3. Notice how each theme hook is added by using `twiggy_add_theme_hook()`.
-4. Now create a Twig file in your module at _itls/templates/pull-quote.html.twig_. **Notice the hyphen instead of underscore.**
+3. Notice how each theme hook has the added key `twiggy` with `__FUNCTION__` as the value.
+4. Now create a Twig file in your module at _itls/templates/pull-quote.html.twig_. **Notice the hyphen in the filename (_...pull-quote..._, not _...pull_quote..._) instead of underscore.**
 5. Create the function `template_preprocess_pull_quote()` if needed.
 6. That's it.
     
@@ -31,23 +31,27 @@ Otherwise you need to do the following in your module directory:
         
           $themes = [];
         
-          twiggy_add_theme_hook($themes, 'pull_quote', array(
-            'variables' => array(
-              'quote' => '',
-              'byline' => NULL,
-            ),
-          ));
+          $themes['pull_quote'] = array(
+              'variables' => array(
+                'quote' => '',
+                'byline' => NULL,
+              ),
+              'twiggy' => __FUNCTION__,
+            );
         
           return $themes;
         }
 
-## If You Want to Use Twig for An Existing Template
+## If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g. _theme_field_.
+
+1. Use _hook_theme_alter_ and add the _twiggy_ key as shown for each theme hook you want to use with Twig.
 
     /**
      * Implements hook_theme_alter().
      */
     function itls_theme_registry_alter(&$themes) {
-        twiggy_add_theme_hook($themes, 'views_view_unformatted');
+      $themes['field']['twiggy'] = __FUNCTION__;
+      $themes['views_view_unformatted']['twiggy'] = __FUNCTION__;
     }
 
 ## If You Want Your Theme to Override a Theme Hook Using Twig
