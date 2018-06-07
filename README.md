@@ -1,19 +1,31 @@
 # Twiggy
 
-Start using Twig for your Drupal 7 websites now.
+Start using Twig for your Drupal 7 websites now.  This module implements **version 1.x of Twig** to be compatible with PHP 5.x. 
 
 ## Install with Composer
 
-This module requires that you are using composer.
+This module requires you to install its dependencies using Composer.
 
 If you are using a sitewide _composer.json_ file than need to do two things; we're assuming that the _composer.json_ file is one level above web root in this example.
 
-1. Run this at the root level: `composer require twig/twig ^1.35`
-2. Add this line to _settings.php_: `$conf['twiggy_vender_autoload'] = DRUPAL_ROOT . '/../vendor/autoload.php';`
+1. Copy the line from the module's _composer.json_ file that requires twig, e.g. `composer require twig/twig ~2` to your sitewide _composer.json_ file.
+2. Now run `composer install --no-dev` for your entire site.
+3. Add this line to _settings.php_: `$conf['twiggy_vender_autoload'] = DRUPAL_ROOT . '/../vendor/autoload.php';`
     
-Otherwise you need to do the following in your module directory:
+Otherwise you need to do the following from within Twiggy module directory:
 
-    composer install
+1. `composer install --no-dev`
+2. Depending on how you're managing dependencies you may or may not need to remove _twiggy/.gitignore_.
+
+For either method above, you should now:
+
+1. Enable the module.
+
+## Configure the Module
+
+
+## To Provide a New Twig Template to Your Custom Theme
+
 
 ## If You are Writing a Module and You Want to Provide a New Theme Hook Using Twig
 
@@ -46,13 +58,13 @@ Otherwise you need to do the following in your module directory:
 
 1. Use _hook_theme_alter_ and add the _twiggy_ key as shown for each theme hook you want to use with Twig.
 
-    /**
-     * Implements hook_theme_alter().
-     */
-    function itls_theme_registry_alter(&$themes) {
-      $themes['field']['twiggy'] = __FUNCTION__;
-      $themes['views_view_unformatted']['twiggy'] = __FUNCTION__;
-    }
+        /**
+         * Implements hook_theme_alter().
+         */
+        function itls_theme_registry_alter(&$themes) {
+          $themes['field']['twiggy'] = __FUNCTION__;
+          $themes['views_view_unformatted']['twiggy'] = __FUNCTION__;
+        }
 
 ## If You Want Your Theme to Override a Theme Hook Using Twig
 
