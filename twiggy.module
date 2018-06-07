@@ -353,11 +353,14 @@ function twiggy_use_twig($hook, array &$themes) {
 }
 
 /**
- * Use this function in your hook_theme to convert your theme definition to use Twiggy.
+ * Use this function in your hook_theme to convert your theme definition to use
+ * Twiggy.
  *
- * @param array  $themes     An array of theme hooks, as returned from hook_theme in your module.
- * @param string $hook       The name of the new theme hook being defined.
- * @param array  $definition The array that defines the theme hook as described by hook_theme
+ * @param array $themes An array of theme hooks, as returned from hook_theme in
+ *   your module.
+ * @param string $hook The name of the new theme hook being defined.
+ * @param array $definition The array that defines the theme hook as described
+ *   by hook_theme
  *
  * @return array
  *
@@ -388,8 +391,9 @@ function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
 
   // Detect the template file to use.
   $dirs = _twiggy_template_dirs($twiggy);
-  if (!(list($pattern, $template) = _twiggy_find_template($dirs, $hook, $definition)) && $defaults['twiggy_debug']) {
-    drupal_set_message(t("Cannot find Twig file for %hook", ['%hook' => $hook]), 'error', FALSE);
+  list(, $template, $haystacks) = _twiggy_find_template($dirs, $hook);
+  if (!$template && $defaults['twiggy_debug']) {
+    throw new \RuntimeException("Cannot find Twig file for $hook.  Looked in: " . implode(', ', $haystacks));
   }
   $twiggy['template_dir'] = dirname($template);
   $twiggy['template_file'] = basename($template);
@@ -471,20 +475,20 @@ function _twiggy_restore_render_element($a, $b) {
  * @param $dirs
  * @param $hook
  *
- * @return bool|string
+ * @return array
+ *   0 string The pattern after replacements.
+ *   1 string The path to the discovered template file.
+ *   2 array An array of search locations for the template.  Stops filling up
+ *   after the first one is located.
  */
-function _twiggy_find_template(array $dirs, $hook, array $definition) {
-  $g = data_api();
-
-
-  // TODO Clean up
-  $pattern = $g->get($definition, 'pattern', $hook);
+function _twiggy_find_template(array $dirs, $hook) {
   $pattern = $hook;
   $pattern = str_replace('_', '-', $pattern);
-
   $template_file = NULL;
+  $haystacks = [];
   foreach ($dirs as $dir) {
     $mask = '/' . preg_quote($pattern) . '.*\.html\.twig/';
+    $haystacks[] = $dir . '/' . $pattern . '*.html.twig';
     $files = file_scan_directory($dir, $mask, ['recurse' => FALSE]);
     if ($files) {
       $template_file = key($files);
@@ -492,20 +496,20 @@ function _twiggy_find_template(array $dirs, $hook, array $definition) {
     }
   }
 
-  return [$pattern, $template_file];
+  return [$pattern, $template_file, $haystacks];
 }
 
 /**
  * Implements hook_filter_info().
  */
 function twiggy_filter_info() {
-  $filters['twiggy_markup'] = array(
+  $filters['twiggy_markup'] = [
     'title' => t('Markup object'),
     'description' => t('Wraps output in an instance of <code>\Drupal\twiggy\Markdown</code> for unescaped output in Twig templates.'),
     'default settings' => [],
     'tips callback' => '_twiggy_markup_tips',
     'process callback' => '_twiggy_markup',
-  );
+  ];
 
   return $filters;
 }
