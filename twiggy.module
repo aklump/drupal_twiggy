@@ -21,11 +21,13 @@ use Drupal\twiggy\MarkupInterface;
 // TODO These are not included and we need a dependency on this.
 
 /**
- * Render the output of a theme function using a twig template.
+ * Render the output of a theme function using a Twig template.
  *
  * @param array $vars
+ *   The variables to send to the Twig template.
  *
  * @return string
+ *   The rendered output.
  */
 function twiggy(array $vars) {
   try {
@@ -60,7 +62,6 @@ function twiggy(array $vars) {
     //    }
 
     $output = $twig->render($twiggy['template_file'], $vars);
-
   }
   catch (\Exception $exception) {
     watchdog_exception('twiggy', $exception);
@@ -148,13 +149,13 @@ function _twiggy_drupalize_twig($twig) {
  *
  * @param \Twig_Environment $env
  *   A Twig_Environment instance.
- * @param mixed             $arg
+ * @param mixed $arg
  *   The value to be escaped.
- * @param string            $strategy
+ * @param string $strategy
  *   The escaping strategy. Defaults to 'html'.
- * @param string            $charset
+ * @param string $charset
  *   The charset.
- * @param bool              $autoescape
+ * @param bool $autoescape
  *   Whether the function is called by the auto-escaping feature (TRUE) or by
  *   the developer (FALSE).
  *
@@ -192,17 +193,17 @@ function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
   if (is_scalar($arg)) {
     $return = (string) $arg;
   }
-  else if (is_object($arg)) {
+  elseif (is_object($arg)) {
     if ($arg instanceof RenderableInterface) {
       $arg = $arg->toRenderable();
     }
-    else if (method_exists($arg, '__toString')) {
+    elseif (method_exists($arg, '__toString')) {
       $return = (string) $arg;
     }
     // You can't throw exceptions in the magic PHP __toString() methods, see
     // http://php.net/manual/language.oop5.magic.php#object.tostring so
     // we also support a toString method.
-    else if (method_exists($arg, 'toString')) {
+    elseif (method_exists($arg, 'toString')) {
       $return = $arg->toString();
     }
     else {
@@ -233,7 +234,8 @@ function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
 }
 
 /**
- * Analyze $arg to see if it's the string value of an attribute, and thus safe to output.
+ * Analyze $arg to see if it's the string value of an attribute, and thus safe
+ * to output.
  *
  * @param $arg , e.g.,  class="contextual-links-region card layout-item"
  *
@@ -270,43 +272,50 @@ function _twiggy_defaults() {
 }
 
 /**
- * Return an array of directories (relative to DRUPAL_ROOT) to search for templates based on a module
+ * Return an array of directories (relative to DRUPAL_ROOT) to search for
+ * templates based on a module or theme definition.
  *
  * @return array
  * @throws \RuntimeException If there are no template directories.
  */
 function _twiggy_template_dirs(array $twiggy) {
-  global $theme;
+  $directories = &drupal_static(__FUNCTION__, array());
+  $static_key = $twiggy['type'] . ':' . $twiggy['module'];
+  if (!array_key_exists($static_key, $directories)) {
+    global $theme;
 
-  $templates = [];
+    $templates = [];
 
-  // These should be listed theme to module order.
-  $templates[] = drupal_get_path('theme', $theme) . '/templates';
-  $templates[] = drupal_get_path('module', $twiggy['module']) . '/templates';
+    // These should be listed theme to module order.
+    $templates[] = drupal_get_path('theme', $theme) . '/templates';
+    $templates[] = drupal_get_path($twiggy['type'], $twiggy['module']) . '/templates';
 
-  $dirs = array_filter($templates, function ($path) {
-    return is_dir($path);
-  });
+    $dirs = array_filter(array_unique($templates), function ($path) {
+      return is_dir($path);
+    });
 
-  if (count($dirs) === 0) {
-    throw new \RuntimeException("No template directories found.");
+    if (count($dirs) === 0) {
+      throw new \RuntimeException("No template directories found.");
+    }
+
+    $directories[$static_key] = $dirs;
   }
 
-  return $dirs;
+  return $directories[$static_key];
 }
 
 /**
  * Implements hook_menu().
  */
 function twiggy_menu() {
-  $items['admin/config/content/twiggy'] = array(
+  $items['admin/config/content/twiggy'] = [
     'title' => 'Twiggy Settings',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('twiggy_settings'),
-    'access arguments' => array('twiggy:administer'),
+    'page arguments' => ['twiggy_settings'],
+    'access arguments' => ['twiggy:administer'],
     'type' => MENU_NORMAL_ITEM,
     'file' => 'twiggy.admin.inc',
-  );
+  ];
 
   return $items;
 }
@@ -356,6 +365,7 @@ function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
 
   // Detect the module defining the theme.
   $twiggy['module'] = preg_replace('/_theme_registry_alter|_theme$/i', '', $function);
+  $twiggy['type'] = $themes[$hook]['type'];
 
   // Detect the template file to use.
   $dirs = _twiggy_template_dirs($twiggy);
@@ -436,7 +446,8 @@ function _twiggy_restore_render_element($a, $b) {
 }
 
 /**
- * Find the template file to use for a given hook, pull_quote looks for pull-quote.html.twig
+ * Find the template file to use for a given hook, pull_quote looks for
+ * pull-quote.html.twig
  *
  * @param $dirs
  * @param $hook
