@@ -56,19 +56,21 @@ For either method above, you should now:
           return $themes;
         }
 
-## If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g. _theme_field_.
+## Convert a PhpTemplate theme to Twig
 
-1. Use _hook_theme_alter_ and add the _twiggy_ key as shown for each theme hook you want to use with Twig.
+_If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g. _theme_field_._
 
+1. Call `twiggy_use_twig` for each theme you want to convert to Twig in your module or theme's `hook_theme_registry_alter` as shown.
+        
         /**
-         * Implements hook_theme_alter().
+         * Implements hook_theme_registry_alter().
          */
-        function itls_theme_registry_alter(&$themes) {
-          $themes['field']['twiggy'] = __FUNCTION__;
-          $themes['views_view_unformatted']['twiggy'] = __FUNCTION__;
+        function flower_theme_theme_registry_alter(&$themes) {
+          twiggy_use_twig('field, $themes);
+          twiggy_use_twig('views_view_unformatted, $themes);
         }
 
-## If You Want Your Theme to Override a Theme Hook Using Twig
+## If You Want Your Theme to Override a module-defined Twig template.
 
 1. In this example I want to override _pull_quote_ in my theme called _flower_.
 2. Copy the file from _itls/templates/pull_quote.html.twig_ to _flower/templates/pull_quote.html.twig_ and modify as needed.

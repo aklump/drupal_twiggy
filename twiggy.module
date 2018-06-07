@@ -334,6 +334,25 @@ function twiggy_permission() {
 }
 
 /**
+ * Upgrade a standard PhpTemplate to use Twig.
+ *
+ * Must be called from within a hook_theme_registry_alter function.  Use this
+ * function to alter an existing hook to use a twig template.
+ *
+ * @param $hook
+ * @param array $themes
+ */
+function twiggy_use_twig($hook, array &$themes) {
+  $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+  array_shift($backtrace);
+  $function = $backtrace[0]['function'];
+  if (!preg_match('/theme_registry_alter$/', $function)) {
+    throw new \RuntimeException('You may only call ' . __FUNCTION__ . ' from a HOOK_theme_registry_alter function.');
+  }
+  _twiggy_add_theme_hook($themes, $hook, $function);
+}
+
+/**
  * Use this function in your hook_theme to convert your theme definition to use Twiggy.
  *
  * @param array  $themes     An array of theme hooks, as returned from hook_theme in your module.
