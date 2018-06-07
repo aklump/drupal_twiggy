@@ -23,6 +23,8 @@ For either method above, you should now:
 
 ## Configure the Module
 
+1. The first thing to do is enable _Debug mode_ so you can see errors that occur in your templates.  Do so at _admin/config/content/twiggy_.  You will want to disable this in production.
+
 
 ## To Provide a New Twig Template to Your Custom Theme
 

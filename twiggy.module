@@ -61,13 +61,16 @@ function twiggy(array $vars) {
 
     $output = $twig->render($twiggy['template_file'], $vars);
 
-  } catch (\Exception $exception) {
+  }
+  catch (\Exception $exception) {
     watchdog_exception('twiggy', $exception);
     if ($defaults['twiggy_debug']) {
-      drupal_set_message(t('Twiggy error: @error in @path', [
-        '@path' => $twiggy['template_dir'] . '/' . $twiggy['template_file'],
-        '@error' => $exception->getMessage(),
-      ]), 'error', FALSE);
+      throw new Twig_Error_Runtime(
+        $exception->getMessage(),
+        $exception->getTemplateLine(),
+        $exception->getSourceContext(),
+        $exception
+      );
     }
   }
 
