@@ -121,19 +121,20 @@ function _twiggy_autoload() {
 function _twiggy_drupalize_twig($twig) {
 
   // Filters.
-  $twig->addFilter(new \Twig_SimpleFilter('trans', 't', array('is_safe' => array('html'))));
+  $twig->addFilter(new \Twig_SimpleFilter('trans', 't', ['is_safe' => ['html']]));
 
   // Functions.
   $twig->addFunction(new \Twig_SimpleFunction('url', 'url'));
 
-  $twig->addFilter(new \Twig_SimpleFilter('drupal_escape', 'twiggy_escape_filter', array(
+  $twig->addFilter(new \Twig_SimpleFilter('drupal_escape', 'twiggy_escape_filter', [
     'needs_environment' => TRUE,
     'is_safe_callback' => 'twig_escape_filter_is_safe',
-  )));
+  ]));
   $twig->addExtension(new \Twig_Extension_Escaper('drupal_escape'));
 
   // Replace the core escaper with our own.
-  $twig->getExtension('Twig_Extension_Core')->setEscaper('drupal_escape', 'twiggy_escape_filter');
+  $twig->getExtension('Twig_Extension_Core')
+    ->setEscaper('drupal_escape', 'twiggy_escape_filter');
 
   // Allow modules to add functions, filters, etc.
   drupal_alter('twiggy_twig', $twig);
@@ -279,7 +280,7 @@ function _twiggy_defaults() {
  * @throws \RuntimeException If there are no template directories.
  */
 function _twiggy_template_dirs(array $twiggy) {
-  $directories = &drupal_static(__FUNCTION__, array());
+  $directories = &drupal_static(__FUNCTION__, []);
   $static_key = $twiggy['type'] . ':' . $twiggy['module'];
   if (!array_key_exists($static_key, $directories)) {
     global $theme;
@@ -324,13 +325,13 @@ function twiggy_menu() {
  * Implements hook_permission().
  */
 function twiggy_permission() {
-  return array(
-    'twiggy:administer' => array(
+  return [
+    'twiggy:administer' => [
       'title' => t('Administer my module'),
       'description' => t('Configure Twiggy module settings.'),
       'restrict access' => TRUE,
-    ),
-  );
+    ],
+  ];
 }
 
 /**
@@ -518,11 +519,11 @@ function twiggy_filter_info() {
  * Implements hook_filter_FILTER_tips().
  */
 function _twiggy_markup_tips($filter, $format, $long = FALSE) {
-  $tips = array();
-  $tips['twiggy_markup'] = array(
+  $tips = [];
+  $tips['twiggy_markup'] = [
     t('Markup object'),
     t('Wraps output in an instance of <code>\Drupal\twiggy\Markdown</code> for unescaped output in Twig templates.'),
-  );
+  ];
 
   return $long ? $tips[$filter->name][1] : $tips[$filter->name][0];
 }
