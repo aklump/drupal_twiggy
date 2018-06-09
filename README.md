@@ -60,7 +60,7 @@ For either method above, you should now:
 
 _If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g. _theme_field_._
 
-1. Call `twiggy_use_twig` for each theme you want to convert to Twig in your module or theme's `hook_theme_registry_alter` as shown.
+1. Call `twiggy_use_twig` for each theme you want to convert to Twig in your theme's `hook_theme_registry_alter` as shown.
         
         /**
          * Implements hook_theme_registry_alter().
@@ -69,7 +69,17 @@ _If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g.
           twiggy_use_twig('field, $themes);
           twiggy_use_twig('views_view_unformatted, $themes);
         }
+        
+1. You may call this from a module's implementation of `hook_theme_registry_alter`, but you MUST pass the third argument as shown:
 
+        /**
+         * Implements hook_theme_registry_alter().
+         */
+        function flower_module_theme_registry_alter(&$themes) {
+          twiggy_use_twig('field, $themes, 'module');
+          twiggy_use_twig('views_view_unformatted, $themes, 'module');
+        }
+        
 ## If You Want Your Theme to Override a module-defined Twig template.
 
 1. In this example I want to override _pull_quote_ in my theme called _flower_.
