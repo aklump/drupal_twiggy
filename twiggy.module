@@ -340,16 +340,27 @@ function twiggy_permission() {
  * Must be called from within a hook_theme_registry_alter function.  Use this
  * function to alter an existing hook to use a twig template.
  *
- * @param $hook
+ * @param string $hook
+ *   The name of the theme hook to be converted to twig.
  * @param array $themes
+ *   The array of theme definitions as sent to hook_theme_registry_alter.
+ * @param string $type
+ *   This should be one of 'theme' or 'module' depending upon where this
+ *   function is being called from.  If you are calling this from a theme you
+ *   needn't pass anything as 'theme' is the default.  If you're calling from a
+ *   module, you must pass 'module'.
  */
-function twiggy_use_twig($hook, array &$themes) {
+function twiggy_use_twig($hook, array &$themes, $type = 'theme') {
+  if (!array_key_exists($hook, $themes)) {
+    throw new \InvalidArgumentException("No theme hook exists called \"$hook\".");
+  }
   $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
   array_shift($backtrace);
   $function = $backtrace[0]['function'];
   if (!preg_match('/theme_registry_alter$/', $function)) {
     throw new \RuntimeException('You may only call ' . __FUNCTION__ . ' from a HOOK_theme_registry_alter function.');
   }
+  $themes[$hook]['type'] = $type;
   _twiggy_add_theme_hook($themes, $hook, $function);
 }
 
