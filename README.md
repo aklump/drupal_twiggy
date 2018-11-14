@@ -110,6 +110,16 @@ _If You Want to Use Twig instead of PhpTemplate for An Existing Theme Hook, e.g.
 * When creating a text format, you may want to add the _Markup object_ as the last filter in the chain, if the output of the format is to be rendered directly in a Twig template, and is certainly safe, and contains HTML.  This will ensure that Twig does not escape what your format has already determined to be safe.
 * In effect you are moving the onus for safe output from Twig to your custom text format..
     
+## Rendering a String Using Twig
+
+Be sure to check out `twiggy_render` to render strings that contain twig vars.
+
+        <?php
+        // Assuming that $message might be "<a href="{{ url }}">click</a>".
+        $vars['message'] = twiggy_render($vars['message'], [
+          'url' => url('<front>'),
+        ]);
+                      
 ## Twig and Drupal Best Practices
 
 <https://www.drupal.org/docs/8/theming/twig/twig-best-practices-preprocess-functions-and-templates>

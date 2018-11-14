@@ -31,8 +31,15 @@ use Drupal\twiggy\MarkupInterface;
  */
 function twiggy(array $vars) {
   try {
+
     $registry = theme_get_registry(TRUE);
-    $twiggy = $registry[$vars['theme_hook_original']]['twiggy'];
+    if (!empty($vars['theme_hook_suggestion']) && isset($registry[$vars['theme_hook_suggestion']]['twiggy'])) {
+      $twiggy = $registry[$vars['theme_hook_suggestion']]['twiggy'];
+    }
+    elseif (isset($registry[$vars['theme_hook_original']]['twiggy'])) {
+      $twiggy = $registry[$vars['theme_hook_original']]['twiggy'];
+    }
+
     $output = '';
     $defaults = _twiggy_defaults();
     $twig_settings = array_combine(array_map(function ($key) {
@@ -78,6 +85,38 @@ function twiggy(array $vars) {
   return $output;
 }
 
+/**
+ * Render a string using Twig.
+ *
+ * @param string $string
+ *   The string to render.
+ * @param array $vars
+ *   The vars array to use in rendering.
+ */
+function twiggy_render($string, array $vars = []) {
+  try {
+    $twig = new \Twig_Environment(new \Twig_Loader_String());
+    _twiggy_drupalize_twig($twig);
+    $output = $twig->render(
+      $string,
+      $vars
+    );
+  }
+  catch (\Exception $exception) {
+    watchdog_exception('twiggy', $exception);
+    $defaults = _twiggy_defaults();
+    if ($defaults['twiggy_debug']) {
+      throw new Twig_Error_Runtime(
+        $exception->getMessage(),
+        $exception->getTemplateLine(),
+        $exception->getSourceContext(),
+        $exception
+      );
+    }
+  }
+
+  return $output;
+}
 
 /**
  * Implements hook_boot().
