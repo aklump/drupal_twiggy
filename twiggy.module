@@ -303,12 +303,17 @@ function _twiggy_is_attributes_string(&$arg) {
  * @return array
  */
 function _twiggy_defaults() {
-  return [
-    'twiggy_debug' => variable_get('twiggy_debug', FALSE),
-    'twiggy_strict_variables' => variable_get('twiggy_strict_variables', TRUE),
-    'twiggy_charset' => variable_get('twiggy_charset', 'utf8'),
-    'twiggy_autoescape' => variable_get('twiggy_autoescape', 'drupal_escape'),
-  ];
+  static $defaults;
+  if (!$defaults) {
+    $defaults = [
+      'twiggy_debug' => variable_get('twiggy_debug', FALSE),
+      'twiggy_strict_variables' => variable_get('twiggy_strict_variables', TRUE),
+      'twiggy_charset' => variable_get('twiggy_charset', 'utf8'),
+      'twiggy_autoescape' => variable_get('twiggy_autoescape', 'drupal_escape'),
+    ];
+  }
+
+  return $defaults;
 }
 
 /**
@@ -413,14 +418,13 @@ function twiggy_use_twig($hook, array &$themes, $type = 'theme') {
  * @param array $definition The array that defines the theme hook as described
  *   by hook_theme
  *
- * @return array
+ * @return array|void
  *
  * @see hook_theme
  */
 function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
   $defaults = _twiggy_defaults();
   $definition = $themes[$hook];
-
   // This comes in from hook_theme_registry_alter.
   if (preg_match('/theme_registry_alter$/', $function)) {
     if (!isset($themes[$hook])) {
@@ -442,9 +446,9 @@ function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
 
   // Detect the template file to use.
   $dirs = _twiggy_template_dirs($twiggy);
-  list(, $template, $haystacks) = _twiggy_find_template($dirs, $hook);
+  list(, $template, $searched_for) = _twiggy_find_template($dirs, $hook);
   if (!$template && $defaults['twiggy_debug']) {
-    throw new \RuntimeException("Cannot find Twig file for $hook.  Looked in: " . implode(', ', $haystacks));
+    throw new \RuntimeException("Cannot find Twig file for $hook.  Looked for: " . implode(', ', $searched_for));
   }
   $twiggy['template_dir'] = dirname($template);
   $twiggy['template_file'] = basename($template);
@@ -485,21 +489,19 @@ function twiggy_camel_case_vars(&$vars) {
   foreach ($vars as $key => $value) {
     if ($key !== ($cc_key = Strings::lowerCamel($key)) && !isset($vars[$cc_key])) {
       $vars[$cc_key] = $value;
-      //      unset($vars[$key]);
     }
   }
 }
 
 function twiggy_theme_registry_alter(&$theme_registry) {
-  // Determine which, if any hooks use twiggy.
-  $hooks = array_map(function ($item) {
+  // Determine which, if any theme_names use twiggy.
+  $theme_names = array_map(function ($item) {
     return $item['twiggy'];
   }, array_filter($theme_registry, function ($item) {
     return isset($item['twiggy']);
   }));
-
-  foreach ($hooks as $hook => $function) {
-    _twiggy_add_theme_hook($theme_registry, $hook, $function);
+  foreach ($theme_names as $theme_name => $function) {
+    _twiggy_add_theme_hook($theme_registry, $theme_name, $function);
   }
 }
 
@@ -536,10 +538,10 @@ function _twiggy_find_template(array $dirs, $hook) {
   $pattern = $hook;
   $pattern = str_replace('_', '-', $pattern);
   $template_file = NULL;
-  $haystacks = [];
+  $searched_for = [];
   foreach ($dirs as $dir) {
-    $mask = '/' . preg_quote($pattern) . '.*\.html\.twig/';
-    $haystacks[] = $dir . '/' . $pattern . '*.html.twig';
+    $mask = '/' . preg_quote($pattern) . '\.html\.twig/';
+    $searched_for[] = $dir . '/' . $pattern . '.html.twig';
     $files = file_scan_directory($dir, $mask, ['recurse' => FALSE]);
     if ($files) {
       $template_file = key($files);
@@ -547,7 +549,7 @@ function _twiggy_find_template(array $dirs, $hook) {
     }
   }
 
-  return [$pattern, $template_file, $haystacks];
+  return [$pattern, $template_file, $searched_for];
 }
 
 /**
