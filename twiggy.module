@@ -464,6 +464,26 @@ function _twiggy_add_theme_hook(array &$themes, $hook, $function) {
     $definition['process functions'][] = 'twiggy_process';
   }
 
+  // Themes need to have {theme}_preprocess and {theme}_process added here.
+  // Normally they would be added by virtue of a template file, but since we
+  // don't require the 'template' key, we need to add them here.
+  if (!empty($template) && $definition['type'] === 'theme') {
+    $function_base = preg_replace('/theme$/', '', $function);
+    foreach (['preprocess', 'process'] as $stage) {
+      $needle = $function_base . $stage . '_' . $hook;
+      $callback = $function_base . $stage;
+      if (!in_array($callback, $definition[$stage . ' functions'])) {
+        if (($found = array_search($needle, $definition[$stage . ' functions'])) !== FALSE) {
+          array_splice($definition[$stage . ' functions'], $found, 0, $callback);
+          continue;
+        }
+        else {
+          $definition[$stage . ' functions'][] = $callback;
+        }
+      }
+    }
+  }
+
   $themes[$hook] = $definition;
 }
 
