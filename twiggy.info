@@ -1,12 +1,13 @@
 name = Twiggy
 description = Start using Twig for your Drupal 7 websites now.
 package = Other
-version = 7.x-1.0-rc8
+version = 7.x-1.0-rc9
 core = 7.x
 php = 5.3
 configure = admin/config/content/twiggy
 author = aklump
 dependencies[] = data_api
+
 
 
 
