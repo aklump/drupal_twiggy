@@ -31,7 +31,6 @@ use Drupal\twiggy\MarkupInterface;
  */
 function twiggy(array $vars) {
   try {
-
     $registry = theme_get_registry(TRUE);
     if (!empty($vars['theme_hook_suggestion']) && isset($registry[$vars['theme_hook_suggestion']]['twiggy'])) {
       $twiggy = $registry[$vars['theme_hook_suggestion']]['twiggy'];
@@ -560,7 +559,7 @@ function _twiggy_find_template(array $dirs, $hook) {
   $template_file = NULL;
   $searched_for = [];
   foreach ($dirs as $dir) {
-    $mask = '/' . preg_quote($pattern) . '\.html\.twig/';
+    $mask = '/^' . preg_quote($pattern) . '\.html\.twig$/';
     $searched_for[] = $dir . '/' . $pattern . '.html.twig';
     $files = file_scan_directory($dir, $mask, ['recurse' => FALSE]);
     if ($files) {
