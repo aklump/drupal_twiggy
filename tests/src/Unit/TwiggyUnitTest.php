@@ -41,6 +41,10 @@ class TwiggyFunctionsUnitTest extends UnitTestBase {
       FALSE,
     );
     $tests[] = array(
+      ' data-autofocus',
+      TRUE,
+    );
+    $tests[] = array(
       ' class="t-explore-stories" data-autofocus data-amplitude="{&quot;do&quot;:&quot;re&quot;,&quot;mi&quot;:&quot;fa&quot;}" href="/library"',
       TRUE,
     );
