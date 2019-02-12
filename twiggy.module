@@ -281,19 +281,8 @@ function twiggy_escape_filter(\Twig_Environment $env, $arg, $charset = NULL) {
  * @return bool
  */
 function _twiggy_is_attributes_string(&$arg) {
-
   // We can play with the fact that attributes strings start always with a space.
-  if (!is_string($arg) || $arg[0] !== ' ') {
-    return FALSE;
-  }
-  if (preg_match_all('/(?:[a-z\-\_]+)=".*?"/', $arg, $matches)) {
-    $safe = ' ' . implode(' ', $matches[0]);
-    if (strlen($safe) === strlen($arg)) {
-      return TRUE;
-    }
-  }
-
-  return FALSE;
+  return is_string($arg) && $arg[0] === ' ' && preg_match('/[a-z]="/i', $arg);
 }
 
 /**
