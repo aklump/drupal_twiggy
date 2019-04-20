@@ -2,7 +2,7 @@
 
 namespace Drupal\Tests\twiggy;
 
-use AKlump\DrupalTest\KernelTestBase;
+use AKlump\DrupalTest\Drupal7\KernelTestCase;
 use Drupal\twiggy\Twiggy;
 
 /**
@@ -13,7 +13,7 @@ use Drupal\twiggy\Twiggy;
  * @SuppressWarnings(PHPMD.StaticAccess)
  * @SuppressWarnings(PHPMD.TooManyPublicMethods)
  */
-class TwiggyKernelTest extends KernelTestBase {
+class TwiggyKernelTest extends KernelTestCase {
 
   /**
    * Define the class being tested, it's arguments and mock objects needed.

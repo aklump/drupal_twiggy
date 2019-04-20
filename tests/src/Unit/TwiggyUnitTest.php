@@ -2,7 +2,7 @@
 
 namespace Drupal\Tests\twiggy;
 
-use AKlump\DrupalTest\UnitTestBase;
+use AKlump\DrupalTest\Drupal7\UnitTestCase;
 use Drupal\twiggy\Twiggy;
 
 /**
@@ -13,7 +13,7 @@ use Drupal\twiggy\Twiggy;
  * @SuppressWarnings(PHPMD.StaticAccess)
  * @SuppressWarnings(PHPMD.TooManyPublicMethods)
  */
-class TwiggyFunctionsUnitTest extends UnitTestBase {
+class TwiggyFunctionsUnitTest extends UnitTestCase {
 
   /**
    * Define the class being tested, it's arguments and mock objects needed.
