@@ -21,9 +21,11 @@ class TwiggyKernelTest extends KernelTestCase {
    * @var array
    *   The schema array for this test.
    */
-  protected $schema = [
-    'classToBeTested' => FALSE,
-  ];
+  protected function getSchema() {
+    return [
+      'classToBeTested' => FALSE,
+    ];
+  }
 
   public function testBannerVideoAndBannerVideoTeaserThemesCanCooexist() {
     $theme_registry = [];
