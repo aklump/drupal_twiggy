@@ -1,8 +1,8 @@
 {
+    "license": "GPL-2.0-or-later",
     "name": "aklump/twiggy",
     "description": "Start using Twig for your Drupal 7 websites now.",
     "type": "library",
-    "license": "BSD",
     "authors": [
         {
             "name": "Aaron Klump",
